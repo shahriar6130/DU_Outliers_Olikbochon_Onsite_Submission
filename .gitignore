@@ -1,0 +1,37 @@
+# Virtual Environment
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Checkpoints
+checkpoints/
+*.pt
+*.pth
+
+# Logs
+logs/
+wandb/
+runs/
+tensorboard/
+
+# Outputs
+outputs/
+submissions/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Environment Variables
+.env
+
+# Cache
+.cache/
