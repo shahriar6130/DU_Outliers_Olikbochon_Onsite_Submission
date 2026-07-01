@@ -1,34 +1,38 @@
-# Structure
+# Project Name: Hallucination Detection & Mitigation
+
+A structured, modular deep learning pipeline designed for detecting and analyzing hallucinations in model outputs. This repository contains the complete workflow from data preprocessing and training to evaluation and inference.
+
+## 📂 Project Structure
+
+```text
 hallucination/
 │
-├── configs/
+├── configs/            # Configuration files (YAML) for experiments
 │   └── baseline.yaml
 │
-├── data/
+├── data/               # Raw and processed data splits
 │   ├── sample.csv
-│   ├── test.csv
+│   └── test.csv
 │
-├── notebooks/
+├── notebooks/          # Jupyter notebooks for EDA and prototyping
 │   └── eda.ipynb
 │
-├── src/
-│   ├── dataset.py
-│   ├── model.py
-│   ├── trainer.py
-│   ├── inference.py
-│   ├── utils.py
-│   └── metrics.py
+├── src/                # Core source code modules
+│   ├── dataset.py      # Custom Dataset and PyTorch DataLoader logic
+│   ├── model.py        # Model architecture and network definition
+│   ├── trainer.py      # Training loop, validation logic, and early stopping
+│   ├── inference.py    # Inference utilities for model predictions
+│   ├── utils.py        # Helper functions (logging, seeding, I/O)
+│   └── metrics.py      # Evaluation metrics (e.g., Accuracy, F1, BLEU/ROUGE)
 │
-├── checkpoints/
+├── checkpoints/        # Saved model weights (.pt or .pth) during training
+├── outputs/            # Training logs, plots, and evaluation reports
+├── submissions/        # Generated final predictions / submission files
 │
-├── outputs/
+├── train.py            # Main script to trigger model training
+├── infer.py            # Main script to run model evaluation/inference
 │
-├── submissions/
-│
-├── train.py
-├── infer.py
-│
-├── requirements.txt
-├── README.md
-├── .gitignore
-└── LICENSE
+├── requirements.txt    # Python dependencies
+├── README.md           # Project documentation
+├── .gitignore          # Git ignore file
+└── LICENSE             # Project license
