@@ -1,0 +1,178 @@
+# ============================================================
+# Bengali LLM Hallucination Detection Challenge
+# Baseline Configuration
+#
+# Version : v1.0
+# Model   : BanglaBERT Base
+# Author  : Team
+# ============================================================
+
+# ============================================================
+# Experiment
+# ============================================================
+
+experiment:
+  name: banglabert_baseline_v1
+  seed: 42
+  deterministic: true
+
+# ============================================================
+# Model
+# ============================================================
+
+model:
+  name: csebuetnlp/banglabert
+  num_labels: 2
+
+# ============================================================
+# Dataset
+# ============================================================
+
+dataset:
+  train_csv: data/train.csv
+  test_csv: data/test.csv
+
+  use_context: true
+
+  null_context_token: "[NO_CONTEXT]"
+
+  max_length: 256
+
+  lowercase: false
+
+  remove_extra_whitespace: true
+
+# ============================================================
+# Input Formatting
+# ============================================================
+
+input_format:
+
+  context_prefix: "[CONTEXT]"
+  no_context_prefix: "[NO_CONTEXT]"
+  prompt_prefix: "[PROMPT]"
+  response_prefix: "[RESPONSE]"
+
+# ============================================================
+# Training
+# ============================================================
+
+training:
+
+  epochs: 4
+
+  batch_size: 8
+
+  gradient_accumulation_steps: 2
+
+  early_stopping_patience: 3
+
+  learning_rate: 0.00002
+
+  weight_decay: 0.01
+
+  warmup_ratio: 0.10
+
+  max_grad_norm: 1.0
+
+  optimizer: AdamW
+
+  scheduler: linear
+
+# ============================================================
+# Validation
+# ============================================================
+
+validation:
+
+  strategy: holdout
+
+  test_size: 0.20
+
+  stratify: true
+
+# ============================================================
+# DataLoader
+# ============================================================
+
+dataloader:
+
+  train_shuffle: true
+
+  num_workers: 0
+
+  pin_memory: false
+
+  persistent_workers: false
+
+# ============================================================
+# Loss
+# ============================================================
+
+loss:
+
+  name: CrossEntropyLoss
+
+# ============================================================
+# Mixed Precision
+# ============================================================
+
+precision:
+
+  use_amp: false
+
+# ============================================================
+# Checkpoints
+# ============================================================
+
+checkpoint:
+
+  directory: checkpoints/
+
+  save_best_only: true
+
+  save_last: true
+
+  monitor: val_f1
+
+  mode: max
+  
+  resume: false
+
+  resume_path: checkpoints/last_model.pt
+
+  best_model_path: checkpoints/best_model.pt
+
+# ============================================================
+# Logging
+# ============================================================
+
+logging:
+
+  log_every_n_steps: 10
+
+  output_directory: outputs/
+
+# ============================================================
+# Weights & Biases
+# ============================================================
+
+wandb:
+
+  enabled: false
+
+  project: Bengali-Hallucination
+
+  entity: null
+
+  run_name: BanglaBERT-Baseline-v1
+
+# ============================================================
+# Submission
+# ============================================================
+
+submission:
+
+  directory: submissions/
+
+  filename: submission.csv
