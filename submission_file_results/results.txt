@@ -1,3 +1,4 @@
 File Name  - Score
 submission_v2.0  -> 0.568
 submission_v3.0  -> 0.466
+submission_v6.0  -> 0.641
