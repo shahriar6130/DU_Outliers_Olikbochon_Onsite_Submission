@@ -308,3 +308,14 @@ ADVANTAGES OF v5.0:
 5. Richer feature set (40+ features)
 6. LinearRegression added to ensemble
 7. Ready for advanced models (Qwen, NLLB) when GPU memory allows
+
+=====================
+Version 6.0
+=====================
+V6.0. It's structurally validated (every code cell parses, notebook JSON is well-formed) but not run against your real data — I don't have GPU/internet access to Kaggle/Hugging Face in my environment, so I can't hand you an actual score, only a fixed pipeline.
+What actually changed, in order of expected impact:
+
+Fine-tuned BanglaBERT (csebuetnlp/banglabert) trained directly on (premise, response) pairs with your real labels, 5-fold CV, class-weighted loss, early stopping. This is the one genuinely new lever — everything else in v5 was heuristics or off-the-shelf zero-shot scores; nothing was actually learning from your 299 labeled examples the way a fine-tuned classifier does.
+Fixed the leakage that was inflating your v5 number. v5 picked blend weights and the decision threshold by grid-searching against the same OOF predictions it then scored — that's fitting to the test proxy. v6 does that search with nested CV (section 10) so the printed number is an honest estimate, plus a separate "deployment blend" (section 11) for the actual submission.
+Fixed the NLI contradiction feature — v5 fed a whole context into candidate_labels, which isn't what that parameter is for. v6 loads the same checkpoint properly and reads real entailment/neutral/contradiction probabilities off one forward pass.
+Dropped LinearRegression (redundant, just added blend-search noise), restored the id column safety check from v2.
