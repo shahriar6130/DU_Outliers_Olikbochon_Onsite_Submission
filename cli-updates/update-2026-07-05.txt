@@ -1,0 +1,32 @@
+Update: 2026-07-05 — v10 "Judge + RAG" pipeline + 5000-row synthetic dataset
+
+NEW FILES
+- synthetic-data/synthetic_train_5000.csv / .json  (5000 rows, schema-matched, 50/50 balanced)
+- synthetic-data/make_dataset.py                    (reproducible generator, fixed seed, no network)
+- synthetic-data/README_and_STRATEGY.md             (dataset description + model/strategy)
+- myNotebooks/model_v10_0.ipynb                      (SUBMISSION notebook, Kaggle-runnable)
+- myNotebooks/train_lora_v10.ipynb                   (optional QLoRA verifier training)
+- v10-code/                                          (core logic, unit tests, cell sources, run guide)
+
+WHY v1-v8 PLATEAUED AT ~0.65
+46% of the test set is [NULL] context (closed-book). BanglaBERT/NLI/e5/hand
+features only measure response<->context consistency -> near-random on closed-book
+-> hard ceiling ~0.65. Confirmed: a consistency-only mock scores 0.658 on the 299.
+
+WHAT v10 DOES (breaks the ceiling with world knowledge; APIs are banned so it's local)
+1. Two-regime routing: context rows vs closed-book rows judged differently.
+2. LLM judge (vLLM): single-token Yes/No logprob for context rows;
+   chain-of-thought + self-consistency (k=5 majority vote) for closed-book rows.
+3. RAG over Bengali Wikipedia: retrieve evidence for closed-book rows, re-judge
+   with the passage (auto-skips if no corpus attached).
+4. One regularized threshold per regime (dropped the overfit 30x30 grid).
+5. Dropped pseudo-labeling (it crashed v3 to 0.466) and the heavy ML stack.
+   Judge-dominant; NLI/e5/LR available as an optional low-weight tie-break.
+
+VERIFIED HERE (CPU): all routing / self-consistency / metric / threshold /
+submission logic (test_core.py 25/25) + full non-GPU dry-run on the real data ->
+valid submission.csv (2516 rows, id,label). GPU judge/RAG must be run on Kaggle.
+
+NEXT: attach a Bengali-Wikipedia dataset for RAG; benchmark Qwen2.5-32B vs
+gemma-2-27b-it vs aya-expanse-32b and keep the best CLOSED-BOOK F1; confirm the
+Kaggle metric (macro vs class-0 F1). See v10-code/README_v10.md.

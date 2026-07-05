@@ -319,3 +319,49 @@ Fine-tuned BanglaBERT (csebuetnlp/banglabert) trained directly on (premise, resp
 Fixed the leakage that was inflating your v5 number. v5 picked blend weights and the decision threshold by grid-searching against the same OOF predictions it then scored — that's fitting to the test proxy. v6 does that search with nested CV (section 10) so the printed number is an honest estimate, plus a separate "deployment blend" (section 11) for the actual submission.
 Fixed the NLI contradiction feature — v5 fed a whole context into candidate_labels, which isn't what that parameter is for. v6 loads the same checkpoint properly and reads real entailment/neutral/contradiction probabilities off one forward pass.
 Dropped LinearRegression (redundant, just added blend-search noise), restored the id column safety check from v2.
+
+=====================
+Version 8.0
+=====================
+
+real data
+
+↓
+
+synthetic verification
+
+↓
+
+BanglaBERT warmup
+
+↓
+
+fine tune
+
+↓
+
+NLI
+
+↓
+
+reranker
+
+↓
+
+embeddings
+
+↓
+
+NER
+
+↓
+
+hand features
+
+↓
+
+Qwen
+
+↓
+
+ensemble
