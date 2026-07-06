@@ -8,6 +8,7 @@ __pycache__/
 
 # Checkpoints
 checkpoints/
+experiments/
 *.pt
 *.pth
 
