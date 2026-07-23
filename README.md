@@ -33,23 +33,25 @@ attached answer bank.
 | 3 | Prompt templates, routing logic (`route_row`), math-keyword regex |
 | 4 | BM25 index built over every attached Wikipedia/QA-bank corpus |
 | 5 | Deterministic QA-bank override (options-verified — see below) |
-| 6 | E5 semantic retrieval (`HYBRID` — currently **off**, see Known limitations) |
+| 6 | E5 semantic retrieval (`HYBRID` — **on**, content-hash-validated cache, see Configuration flags) |
 | 7 | LoRA verifier pass (currently **off** — leakage risk, see Known limitations) |
 | 8 | vLLM judge engine load, prompt formatting, judge-response caching |
 | 9 | Prompt builders (`p_grounded`, `p_closedbook`, `p_math`) and verdict parsing |
-| 10 | Per-row scoring: bank overrides first, then lp32 + cot32 for whatever's left |
-| 11 | Per-route blend-weight + threshold fitting via 5-fold CV on the labeled sample |
+| 10 | Per-row scoring: bank overrides first, then adaptive lp32 + cot32 allocation for whatever's left |
+| 11 | Per-route blend-weight + threshold fitting via 5-fold CV (linear blend vs. logistic stacker, CV-selected) |
 | 12 | Final blend, thresholding, `submission.csv` + `test_scores.csv` output |
 | 13 | Notes |
 
-## Configuration flags (cell 2 / cell 6 / cell 2)
+## Configuration flags (cell 2 / cell 6 / cell 11)
 
 | Flag | Current value | Why |
 |---|---|---|
 | `USE_LORA` | `False` | The fine-tuned verifier adapter was trained on the same 299-row calibration sample used to fit blend weights — any weight learned from it is leakage. Two real submissions with it enabled scored below the no-LoRA baseline. |
-| `HYBRID` | `False` | E5 semantic retrieval is implemented (cell 6) but disabled — a corpus-reorder previously went undetected by a row-count-only cache check. Safe to re-enable once the cache validation is content-based, not just row-count-based. |
+| `HYBRID` | `True` | E5 semantic retrieval (cell 6), re-enabled after fixing the root cause of the prior stale-cache bug: the cache is now validated against a SHA-1 fingerprint of the corpus content, not just its row count, so a reordered corpus can no longer silently poison a cached embedding file. |
 | `RAG_MAX_PASSAGES` | `900_000` | Raised from `500_000` after 3 overlapping QA-bank dataset attachments were found to truncate the Wikipedia corpus tail in a real run. |
-| `K_GROUNDED`, `K_CLOSEDBOOK`, `K_MATH` | `3, 5, 3` | Chain-of-thought votes per row; auto-reduced to `2, 4` when the test set exceeds 4,000 rows, to stay inside the 9-hour runtime cap. |
+| `ADAPTIVE_ROUTES` | `True` | Rows where the lp32 pass already reads confidently (`<=0.05` or `>=0.95`) skip the CoT judge call entirely; the calls saved fund `k_base+2` votes on rows genuinely near the decision boundary. Same or less total compute than fixed-K sampling. |
+| `K_GROUNDED`, `K_CLOSEDBOOK`, `K_MATH` | `3, 5, 3` (base) | Chain-of-thought votes per row; auto-reduced to `2, 4` when the test set exceeds 4,000 rows, to stay inside the 9-hour runtime cap. |
+| Stacker (cell 11) | linear blend or logistic regression, chosen per route by 5-fold CV | A small L2-regularized logistic regression over `[lp32, cot32]` is tried alongside the linear weighted blend on every fold; whichever wins on held-out performance for that route is used in the final fit — never selected from in-sample fit alone. |
 | `BANK_DOCS` matching | options-verified | A bank match is only trusted when the test response appears among the matched question's listed options — this excludes template-question collisions (different question, same wording shape) that previously caused a real regression. |
 
 ## External data (declared, public, non-test-derived)
@@ -64,12 +66,10 @@ attached answer bank.
 | BanglaHalluEval (organizer-provided benchmark, `BanglaHalluEval-EB77`) | Extended calibration data — scored through the same judge and blended into per-route weight fitting only, never into the honest cross-validation number, and never touching the competition test set | Provided directly by the competition organizers for this purpose |
 
 All of the above are public, cited, and were not derived from the competition's test set, per the rules'
-External Data Policy. The BanglaHalluEval-derived extended-calibration CSVs and the notebook that scores
-them (`score_ext_calib.ipynb`) were built during this project but are not currently present in this local
-folder — if you need to regenerate them, see **Known gaps** below.
-All external links including-> External Datasets,vLLMs,Model Checkpoints,Models are found in this link given below:
--
-- https://github.com/shahriar6130/hallucination/blob/main/Dataset/links.md
+External Data Policy. Full external dataset / model / vLLM wheel links are in
+[`Dataset/links.md`](Dataset/links.md), including the BanglaHalluEval extended-calibration set
+(`bangla-hallu-eval-1200`, `benhallueval-v1`), the cached corpus embeddings (`corpus-emb-v13`), and the
+judge response cache (`judge-cache`).
 
 ## Models used
 
@@ -78,7 +78,7 @@ All external links including-> External Datasets,vLLMs,Model Checkpoints,Models 
 | Qwen2.5-32B-Instruct-AWQ | Primary judge — lp32 (single-token logprob) and cot32 (chain-of-thought vote) signals |
 | Qwen2.5-14B-Instruct-AWQ | Fallback judge, only used if the 32B snapshot fails to load (`JUDGE_LADDER`) |
 | Qwen2.5-14B-Instruct + LoRA adapter | Third verifier signal — implemented, currently disabled (`USE_LORA=False`, see Known limitations) |
-| `multilingual-e5-small` | Semantic retrieval encoder for hybrid BM25+embedding evidence — implemented, currently disabled (`HYBRID=False`) |
+| `multilingual-e5-small` | Semantic retrieval encoder for hybrid BM25+embedding evidence — enabled (`HYBRID=True`), content-hash cache validation |
 
 All models are open-weight, loaded from Kaggle-attached datasets/snapshots, run entirely locally via
 vLLM — no external API calls, per the competition's compute rules.
@@ -107,38 +107,20 @@ truncate the Wikipedia corpus).
   cross-validation number. Root cause: the 299-row labeled sample is small relative to the real test set
   and doesn't fully represent its difficulty distribution — confirmed via a prior regression where 378
   real test rows were affected by a failure mode invisible in the 299-row sample. The extended-calibration
-  blend (BanglaHalluEval-derived data, when attached) is the direct countermeasure, but it does not close
-  this gap by construction — it narrows it with more representative labeled data.
-- **`HYBRID` (E5 semantic retrieval) is implemented but disabled.** It was turned off after a stale
-  cached embedding file went undetected by a cache check that only compared row counts, not content —
-  re-enabling it safely requires a content-based cache validation (e.g., a corpus fingerprint) before
-  trusting a cached embedding file across runs.
+  blend (BanglaHalluEval-derived data) is the direct countermeasure, but it does not close this gap by
+  construction — it narrows it with more representative labeled data.
 - **`USE_LORA` is implemented but disabled.** The adapter was fine-tuned on the same 299 rows used for
   calibration, so any weight learned from its output is leakage, not signal. It would need to be
   retrained on fully held-out data (e.g., the BanglaHalluEval calibration extension) to be usable safely.
 - **Closedbook is the least-protected route.** With `lp32`/`cot32` as the only signals and no bank match,
   it has zero fallback if the judge's own world knowledge is wrong — this is also the route where the
   competition's C1 (Bangladesh-specific) cultural-distance band concentrates, per the problem statement.
+- **`HYBRID` retrieval was re-enabled this session** after fixing its cache-validation bug, but has not
+  yet been validated against a real Kaggle run with the actual judge — only against synthetic data to
+  confirm the code path executes correctly. Set `HYBRID=False` in cell 6 for a lower-risk run if needed.
 
-## Known gaps in this folder (vs. what's been built during this project)
+## Repository contents
 
-This folder currently holds `kaggle_inference_v16.ipynb` and `prep_build_wiki_index.ipynb`. Several
-supporting artifacts referenced in the notebook's own logic (it looks for `calib_scores_ext.csv` and
-`banglahallueval_ext_calib_*.csv` under `/kaggle/input`) were built earlier in this project but are not
-present locally right now:
-
-- `score_ext_calib.ipynb` — one-time notebook that scores an extended calibration sample through the
-  same judge.
-- `banglahallueval_ext_calib_*.csv` — the extended calibration sample itself (source-grouped,
-  class-balanced subsamples of the BanglaHalluEval benchmark).
-- `prep_build_qa_bank.ipynb` and `bangla_bcs_qs.parquet` — build the QA-bank retrieval corpus.
-
-If these were already uploaded as Kaggle datasets, this is not a problem — the inference notebook reads
-them from `/kaggle/input` regardless of what's mirrored in this local folder. If they need to be rebuilt,
-say so and they can be regenerated.
-
-**One more thing worth flagging directly: this exact notebook file does not currently include three
-engineering changes (adaptive compute allocation, a properly cache-validated hybrid retrieval fix, and a
-cross-validation-selected logistic-regression stacker) that were built and validated in this project's
-most recent working session.** If the file in this folder was restored from an older Kaggle notebook
-version, those changes aren't in it. Say the word and they can be reapplied.
+- `IUT DATATHON/DU_Outliers_inference_notebook.ipynb` — the submission notebook described above.
+- `prep_build_wiki_index.ipynb` — one-time prep notebook, builds the Bengali Wikipedia passage corpus.
+- `Dataset/links.md` — every external dataset, model, and vLLM wheel link used by the inference notebook.
