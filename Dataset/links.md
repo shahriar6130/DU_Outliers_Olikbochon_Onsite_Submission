@@ -20,6 +20,10 @@ External Datasets links:
 
 - https://www.kaggle.com/datasets/sakhadib/bagdhara-bangla-idioms-dataset
 
+- https://www.kaggle.com/datasets/faiazibneiqbal/bangla-hallu-eval-2496
+
+- https://www.kaggle.com/datasets/faiazibneiqbal/hallueval-v2-0
+
 
 
 Model Checkpoints links:
